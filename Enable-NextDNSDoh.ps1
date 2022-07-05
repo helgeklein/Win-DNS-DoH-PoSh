@@ -12,8 +12,49 @@ Set-StrictMode -Version 3
 # Inspiration: https://help.nextdns.io/t/60hj3yd/enable-doh-natively-on-windows-11
 #
 
-# Get user input
-$id = Read-Host "NextDNS ID"
+$settingsPath    = "HKCU:\Software\Helge Klein\Enable-NextDNSDoh"
+$previousIdValue = "NextDNS ID"
+
+#
+# Get the NextDNS ID, offering the previously entered ID as default
+#
+# Retrieve a stored ID
+$previousId = ""
+if (Test-Path -Path $settingsPath)
+{
+   if ((Get-Item $settingsPath).Property -contains $previousIdValue)
+   {
+      $previousId = Get-ItemPropertyValue -Path $settingsPath -Name $previousIdValue
+   }
+}
+else
+{
+   # Create the settings key
+   New-Item -Path $settingsPath -Force | Out-Null
+}
+$idPrompt = "NextDNS ID"
+if (-not ([string]::IsNullOrEmpty($previousId)))
+{
+   $idPrompt += " [$previousId]"
+}
+# Read the ID from the user
+$id = Read-Host $idPrompt
+if ([string]::IsNullOrEmpty($id))
+{
+   $id = $previousId
+}
+else
+{
+   # Store the ID
+   New-ItemProperty -Path $settingsPath -Name $previousIdValue -Value $id | Out-Null
+}
+if ([string]::IsNullOrEmpty($id))
+{
+   Write-Host "The ID is required. Quitting." -ForegroundColor Red
+   Exit
+}
+
+# Read the device name
 $device = Read-Host "Device name (leave empty if anonymous)"
 
 # User-configurable
@@ -26,7 +67,7 @@ $ipv6b = "2a07:a8c1::" + $id.substring(0,2) + ":" + $id.substring(2,4)
 $template = "https://dns.nextdns.io/" + $id + "/" + $device
 
 # Remove existing DoH entries (there is no cmdlet to create *and/or* update entries)
-Write-Host "DoH servers: $ipv4a, $ipv4b, $ipv6a, $ipv6b"
+Write-Host "DoH servers: $ipv4a, $ipv4b, $ipv6a, $ipv6b" -ForegroundColor Green
 Write-Host "Removing previously configured settings for DoH servers..." -ForegroundColor Green
 Remove-DnsClientDohServerAddress -ServerAddress $ipv4a, $ipv4b, $ipv6a, $ipv6b -Erroraction Ignore | Out-Null
 
